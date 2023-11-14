@@ -1,0 +1,19 @@
+TOKEN "deliveries_api_endpoint_read_7845" READ
+
+NODE deliveries_api_0
+SQL >
+
+    %
+        SELECT * FROM deliveries_latest FINAL
+        where 1
+        {% if defined(delivery_id) %}
+          and delivery_id = {{String(delivery_id, description="delivery_id to filter by", required=False)}}
+        {% end %}
+        {% if defined(status) %}
+          and status = {{String(status, description="status to filter by", required=False)}}
+        {% end %}
+        {% if defined(driver_id) %}
+          and driver_id = {{String(driver_id, description="driver_id to filter by", required=False)}}
+        {% end %}
+
+

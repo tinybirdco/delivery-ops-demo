@@ -1,0 +1,13 @@
+
+SCHEMA >
+    `delivery_id` String,
+    `driver_id` String,
+    `start_time` DateTime64(6),
+    `status` String,
+    `orders` Array(String),
+    `updated_at` DateTime64(6)
+
+ENGINE "ReplacingMergeTree"
+ENGINE_PARTITION_KEY "toYYYYMM(updated_at)"
+ENGINE_SORTING_KEY "delivery_id"
+ENGINE_VER "updated_at"

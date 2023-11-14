@@ -1,0 +1,10 @@
+
+SCHEMA >
+    `driver_id` String `json:$.driver_id`,
+    `name` String `json:$.name`,
+    `status` String `json:$.status`,
+    `updated_at` DateTime64(6) `json:$.updated_at`
+
+ENGINE "MergeTree"
+ENGINE_PARTITION_KEY "toYYYYMM(updated_at)"
+ENGINE_SORTING_KEY "driver_id"

@@ -1,0 +1,11 @@
+
+SCHEMA >
+    `customer_id` String,
+    `name` String,
+    `address` String,
+    `updated_at` DateTime64(6)
+
+ENGINE "ReplacingMergeTree"
+ENGINE_PARTITION_KEY "toYYYYMM(updated_at)"
+ENGINE_SORTING_KEY "customer_id"
+ENGINE_VER "updated_at"

@@ -1,0 +1,43 @@
+# Python artefacts
+*.pyc
+__pycache__/
+*.pyo
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Visual Studio artefacts
+.vs/
+bin/
+obj/
+Debug/
+Release/
+*.suo
+*.user
+*.ncb
+*.aps
+*.pch
+*.vspscc
+*.vssscc
+*_i.c
+*_p.c
+*.ilk
+*.meta
+*.obj
+*.log
+*.tlog
+*.dll
+*.exe
+*.pdb
+*.vcproj
+*.vcxproj
+*.sln
+*.cache
+*.userprefs
+*.dbmdl
+*.dbproj.user
+*.dbproj
+
+# Tinybird auth keys
+.tinyb

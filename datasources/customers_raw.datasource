@@ -1,0 +1,11 @@
+
+SCHEMA >
+    `customer_id` String `json:$.customer_id`,
+    `name` String `json:$.name`,
+    `address` String `json:$.address`,
+    `updated_at` DateTime64(6) `json:$.updated_at`
+
+ENGINE "MergeTree"
+ENGINE_PARTITION_KEY "toMonth(updated_at)"
+ENGINE_SORTING_KEY "customer_id, updated_at"
+ENGINE_TTL "toDateTime(updated_at) + toIntervalDay(14)"

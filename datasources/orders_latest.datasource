@@ -1,0 +1,15 @@
+
+SCHEMA >
+    `order_id` String,
+    `customer_id` String,
+    `delivery_id` String,
+    `status` String,
+    `delivery_slot_start` DateTime64(6),
+    `delivery_slot_end` DateTime64(6),
+    `delivery_completed_at` Nullable(DateTime64(6)),
+    `updated_at` DateTime64(6)
+
+ENGINE "ReplacingMergeTree"
+ENGINE_PARTITION_KEY "toYYYYMM(updated_at)"
+ENGINE_SORTING_KEY "order_id"
+ENGINE_VER "updated_at"

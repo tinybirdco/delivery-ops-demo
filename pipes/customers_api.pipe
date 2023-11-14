@@ -1,0 +1,16 @@
+TOKEN "customers_api_endpoint_read_1066" READ
+
+NODE endpoint
+DESCRIPTION >
+    undefined
+
+SQL >
+
+    %
+        SELECT * FROM customers_latest FINAL
+        where 1
+        {% if defined(customer_id) %}
+        and customer_id = {{String(customer_id)}}
+        {% end %}
+
+

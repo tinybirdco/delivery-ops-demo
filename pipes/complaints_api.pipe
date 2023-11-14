@@ -1,0 +1,10 @@
+TOKEN "complaints_pipe_8837_endpoint_read_5608" READ
+
+NODE complaints_pipe
+SQL >
+
+    %
+    SELECT * FROM complaints
+    WHERE created_at > {{DateTime64(latest_import,'2023-01-01 00:00:00.000') }}
+
+

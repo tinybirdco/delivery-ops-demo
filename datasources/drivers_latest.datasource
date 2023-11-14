@@ -1,0 +1,11 @@
+
+SCHEMA >
+    `driver_id` String,
+    `name` String,
+    `status` String,
+    `updated_at` DateTime64(6)
+
+ENGINE "ReplacingMergeTree"
+ENGINE_PARTITION_KEY "toYYYYMM(updated_at)"
+ENGINE_SORTING_KEY "driver_id"
+ENGINE_VER "updated_at"

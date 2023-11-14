@@ -1,0 +1,9 @@
+NODE orders_mv_0
+SQL >
+
+    select * from orders_raw
+
+TYPE materialized
+DATASOURCE orders_latest
+
+

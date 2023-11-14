@@ -1,0 +1,17 @@
+
+SCHEMA >
+    `complaint_id` String `json:$.complaint_id`,
+    `created_at` String `json:$.created_at`,
+    `customer_id` String `json:$.customer_id`,
+    `customer_name` String `json:$.customer_name`,
+    `delivery_created_at` String `json:$.delivery_created_at`,
+    `delivery_id` String `json:$.delivery_id`,
+    `driver_id` String `json:$.driver_id`,
+    `driver_name` String `json:$.driver_name`,
+    `nature_of_complaint` String `json:$.nature_of_complaint`,
+    `notes` String `json:$.notes`,
+    `status` String `json:$.status`,
+    `updated_at` String `json:$.updated_at`
+
+ENGINE "MergeTree"
+ENGINE_SORTING_KEY "complaint_id, notes, status, updated_at"

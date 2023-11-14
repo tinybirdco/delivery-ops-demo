@@ -1,0 +1,16 @@
+TOKEN "orders_api_endpoint_read_1865" READ
+
+NODE orders_api_0
+SQL >
+
+    %
+        SELECT * FROM orders_latest FINAL
+        WHERE 1
+        {% if defined(orders_in) %}
+          and order_id in splitByString(',', {{String(orders_in, description="comma separated list of order_id entries to include", required=False)}})
+        {% end %}
+        {% if defined(order_id) %}
+          and order_id = {{String(order_id, description="single order_id to fetch", required=False)}}
+        {% end %}
+
+

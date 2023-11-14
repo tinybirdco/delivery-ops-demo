@@ -1,0 +1,29 @@
+TOKEN "customers_by_order_status_endpoint_read_6677" READ
+
+NODE customers_by_order_status_0
+SQL >
+
+    %
+      SELECT 
+        c.customer_id,
+        c.name,
+        c.address,
+        c.updated_at as customer_updated_at,
+        o.status,
+        groupArray(o.order_id) as order_ids,
+        count(o.order_id) as orders_count
+      FROM customers_latest as c FINAL
+      left join orders_latest as o FINAL on c.customer_id = o.customer_id
+      where 1
+      {% if defined(order_status_in) %}
+        and o.status in splitByString(',', {{String(order_status_in, description="comma separated list of Status entries to include", required=False)}})
+      {% end %}
+      {% if defined(order_status_not_in) %}
+        and o.status not in splitByString(',', {{String(order_status_not_in, description="comma separated list of Status entries to exclude", required=False)}})
+      {% end %}
+      {% if defined(customer_id) %}
+        and c.customer_id = {{String(customer_id, description="Fetch single customer", required=False)}}
+      {% end %}
+      group by c.customer_id, c.name, c.address, c.updated_at, o.status
+
+

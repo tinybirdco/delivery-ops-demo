@@ -1,0 +1,35 @@
+TOKEN "deliveries_by_order_status_endpoint_read_0338" READ
+
+NODE deliveries_by_order_status_0
+SQL >
+
+    SELECT 
+      delivery_id,
+      COUNT(IF(status = 'SCHEDULED', 1, NULL)) AS scheduled_count,
+      COUNT(IF(status = 'DELIVERED', 1, NULL)) AS delivered_count,
+      COUNT(IF(status = 'MISSED', 1, NULL)) AS missed_count
+    FROM orders_latest FINAL
+    GROUP BY delivery_id
+
+
+
+NODE deliveries_by_order_status_1
+SQL >
+
+    with
+        dl_status as (
+            select delivery_id, status as delivery_status,
+            length(orders) as total_orders
+            from deliveries_latest FINAL
+        )
+    select
+        deliveries_by_order_status_0.delivery_id,
+        deliveries_by_order_status_0.scheduled_count,
+        deliveries_by_order_status_0.delivered_count,
+        deliveries_by_order_status_0.missed_count,
+        dl_status.delivery_status,
+        dl_status.total_orders
+    from deliveries_by_order_status_0 as node_0
+    join dl_status on dl_status.delivery_id = node_0.delivery_id
+
+

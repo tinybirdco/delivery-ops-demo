@@ -1,0 +1,35 @@
+TOKEN "drivers_api_endpoint_read_8634" READ
+
+NODE drivers_api_0
+SQL >
+
+    %
+        SELECT 
+          dt.driver_id, 
+          dt.name,
+          -- Use argMax to select the most recent status and corresponding time
+          argMax(
+            if(dt.updated_at >= dls.event_time, dt.status, dls.event_type),
+            greatest(dt.updated_at, dls.event_time)
+          ) as current_status,
+          -- Use argMax to select the latest updated_at from both tables
+          argMax(
+            greatest(dt.updated_at, dls.event_time),
+            greatest(dt.updated_at, dls.event_time)
+          ) as updated_at
+        FROM drivers_latest as dt FINAL
+        LEFT JOIN driver_live_status as dls FINAL
+        ON dt.driver_id = dls.driver_id
+        WHERE 1
+        {% if defined(driver_id) %}
+        AND dt.driver_id = {{String(driver_id, description="driver_id to filter by", required=False)}}
+        {% end %}
+        {% if defined(status_in) %}
+          and dt.status in splitByString(',', {{String(status_in, description="comma separated list of Status entries to include", required=False)}})
+        {% end %}
+        {% if defined(status_not_in) %}
+          and dt.status not in splitByString(',', {{String(status_not_in, description="comma separated list of Status entries to exclude", required=False)}})
+        {% end %}
+        GROUP BY dt.driver_id, dt.name
+
+

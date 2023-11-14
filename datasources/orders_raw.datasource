@@ -1,0 +1,15 @@
+
+SCHEMA >
+    `order_id` String `json:$.order_id`,
+    `customer_id` String `json:$.customer_id`,
+    `delivery_id` String `json:$.delivery_id`,
+    `status` String `json:$.status`,
+    `delivery_slot_start` DateTime64(6) `json:$.delivery_slot_start`,
+    `delivery_slot_end` DateTime64(6) `json:$.delivery_slot_end`,
+    `delivery_completed_at` Nullable(DateTime64(6)) `json:$.delivery_completed_at`,
+    `updated_at` DateTime64(6) `json:$.updated_at`
+
+ENGINE "MergeTree"
+ENGINE_PARTITION_KEY "toMonth(updated_at)"
+ENGINE_SORTING_KEY "order_id, status, updated_at"
+ENGINE_TTL "toDateTime(updated_at) + toIntervalDay(14)"
