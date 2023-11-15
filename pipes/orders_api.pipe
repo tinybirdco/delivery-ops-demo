@@ -3,14 +3,38 @@ TOKEN "orders_api_endpoint_read_1865" READ
 NODE orders_api_0
 SQL >
 
-    %
-        SELECT * FROM orders_latest FINAL
-        WHERE 1
-        {% if defined(orders_in) %}
-          and order_id in splitByString(',', {{String(orders_in, description="comma separated list of order_id entries to include", required=False)}})
-        {% end %}
-        {% if defined(order_id) %}
-          and order_id = {{String(order_id, description="single order_id to fetch", required=False)}}
-        {% end %}
-
+%
+SELECT 
+  dwh.order_id, 
+  dwh.customer_id,
+  dwh.delivery_id,
+  argMax(
+    if(dwh.updated_at >= stream.updated_at, dwh.status, stream.status),
+    greatest(dwh.updated_at, stream.updated_at)
+  ) as status,
+  dwh.delivery_slot_start,
+  dwh.delivery_slot_end,
+  dwh.delivery_completed_at,
+  argMax(
+    greatest(dwh.updated_at, stream.updated_at),
+    greatest(dwh.updated_at, stream.updated_at)
+  ) as updated_at
+FROM dwh_orders_latest as dwh FINAL
+LEFT JOIN orders_live_status as stream FINAL
+ON dwh.order_id = stream.order_id
+WHERE 1
+  {% if defined(orders_in) %}
+  AND dwh.order_id in splitByString(',', {{String(orders_in, description="comma separated list of order_id entries to include", required=False)}})
+  {% end %}
+  {% if defined(order_id) %}
+  AND dwh.order_id = {{String(order_id, description="single order_id to fetch", required=False)}}
+  {% end %}
+GROUP BY dwh.order_id, dwh.customer_id, dwh.delivery_id, dwh.delivery_slot_start, dwh.delivery_slot_end, dwh.delivery_completed_at
+HAVING 1
+  {% if defined(status_in) %}
+  AND status in splitByString(',', {{String(status_in, description="comma separated list of Status entries to include", required=False)}})
+  {% end %}
+  {% if defined(status_not_in) %}
+  AND status not in splitByString(',', {{String(status_not_in, description="comma separated list of Status entries to exclude", required=False)}})
+  {% end %}
 

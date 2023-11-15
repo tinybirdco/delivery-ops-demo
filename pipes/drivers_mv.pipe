@@ -1,9 +1,0 @@
-NODE drivers_mv_0
-SQL >
-
-    SELECT * FROM drivers_raw
-
-TYPE materialized
-DATASOURCE drivers_latest
-
-

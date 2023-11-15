@@ -12,9 +12,9 @@ SQL >
         o.status,
         groupArray(o.order_id) as order_ids,
         count(o.order_id) as orders_count
-      FROM customers_latest as c FINAL
-      left join orders_latest as o FINAL on c.customer_id = o.customer_id
-      where 1
+      FROM dwh_customers_latest as c FINAL
+      left join orders_api as o on c.customer_id = o.customer_id
+      where status != ''
       {% if defined(order_status_in) %}
         and o.status in splitByString(',', {{String(order_status_in, description="comma separated list of Status entries to include", required=False)}})
       {% end %}
@@ -25,5 +25,4 @@ SQL >
         and c.customer_id = {{String(customer_id, description="Fetch single customer", required=False)}}
       {% end %}
       group by c.customer_id, c.name, c.address, c.updated_at, o.status
-
 

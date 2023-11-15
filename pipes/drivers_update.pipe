@@ -1,0 +1,9 @@
+NODE drivers_update_0
+SQL >
+
+    SELECT * FROM cdc_drivers
+
+TYPE materialized
+DATASOURCE dwh_drivers_latest
+
+

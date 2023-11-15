@@ -6,12 +6,14 @@ import logging
 import datetime
 from time import sleep
 
-TARGET_ACTIVE_DELIVERIES = 5
+TARGET_ACTIVE_DELIVERIES = 10
 MAX_ORDERS_PER_DELIVERY = 10
-MAX_ORDERS_TO_PROCESS_PER_RUN = 5
 TARGET_AVAILABLE_CUSTOMERS = 50
 TARGET_AVAILABLE_DRIVERS = 10
 DELIVERY_TIME_INTERVAL = datetime.timedelta(seconds=15)
+UPDATE_WAIT_SLEEP = 0.5
+MINIMUM_TS_BOUNDARY = 0.01
+DELIVERY_MISS_RATE = 0.05
 
 fake = faker.Faker(locale='en_GB')
 
@@ -30,9 +32,15 @@ def format_datetime(dt_obj):
 def parse_datetime(dt_str):
     """Parses a datetime string into a datetime object."""
     try:
-        return datetime.datetime.strptime(dt_str, '%Y-%m-%d %H:%M:%S.%f')
+        if '.' in dt_str and dt_str[-1] != 'Z':
+            return datetime.datetime.strptime(dt_str, '%Y-%m-%d %H:%M:%S.%f')
+        elif '.' in dt_str and dt_str[-1] == 'Z':
+            return datetime.datetime.strptime(dt_str, '%Y-%m-%dT%H:%M:%S.%fZ')
+        else:
+            return datetime.datetime.strptime(dt_str, '%Y-%m-%d %H:%M:%S')    
     except ValueError:
-        return datetime.datetime.strptime(dt_str, '%Y-%m-%d %H:%M:%S')
+        logging.error(f"Error parsing datetime string {dt_str}")
+        raise
 
 def generate_unique_entity_id(existing_entities, id_field):
     """Generates a unique entity ID that is not in the existing_entities list."""
@@ -62,7 +70,7 @@ def ensure_available_customers(tb_info):
         logging.info(f"{len(current_customers)} customers found of target {TARGET_AVAILABLE_CUSTOMERS}; generating {new_customer_count} new customers...")
         new_customers = generate_customers(current_customers, new_customer_count)
         logging.info("Posting new customers to Tinybird...")
-        post_data_to_tb(tb_info, 'customers_raw', new_customers)
+        post_data_to_tb(tb_info, 'cdc_customers', new_customers)
         wait_for_update(tb_info, new_customers[-1], 'customer_id', 'customers_api')
         return current_customers + new_customers
     else:
@@ -88,7 +96,7 @@ def ensure_available_drivers(tb_info):
         logging.info(f"{len(current_drivers)} drivers found of target {TARGET_AVAILABLE_DRIVERS}; generating {new_driver_count} new drivers...")
         new_drivers = generate_drivers(current_drivers, new_driver_count)
         logging.info("Posting new drivers to Tinybird...")
-        post_data_to_tb(tb_info, 'drivers_raw', new_drivers)
+        post_data_to_tb(tb_info, 'cdc_drivers', new_drivers)
         wait_for_update(tb_info, new_drivers[-1], 'driver_id', 'drivers_api')
         return current_drivers + new_drivers
     else:
@@ -138,11 +146,14 @@ def read_tb_info():
         logging.error(f"Error reading Tinybird info: {e}")
         raise
 
-def generate_delivery_and_orders(tb_info, customers, drivers):
-    logging.info(f"Generating new a delivery and orders and assigning a driver...")
+def generate_delivery(tb_info, orders=None):
+    logging.info("Fetching Drivers without active deliveries from Tinybird...")
+    drivers = ensure_available_drivers(tb_info)
+
+    logging.info(f"Generating a new delivery and assigning a driver...")
     delivery_id = fake.uuid4()
     driver = drivers[0]
-    num_orders = fake.random_int(min=1, max=MAX_ORDERS_PER_DELIVERY)
+    num_orders = len(orders) if orders else fake.random_int(min=1, max=MAX_ORDERS_PER_DELIVERY)
     start_time = current_time()
     delivery = {
         "delivery_id": delivery_id,
@@ -151,59 +162,69 @@ def generate_delivery_and_orders(tb_info, customers, drivers):
         "status": "SCHEDULED",
         "updated_at": format_datetime(current_time())
     }
-    orders = []
+    # If rescheduling, use the provided orders
+    if orders:
+        new_orders = orders
+    else:
+        # Else generate new orders
+        new_orders = []
+        logging.info("Fetching Customers without active orders from Tinybird...")
+        customers = ensure_available_customers(tb_info)
+        logging.info("Generating new orders for delivery...")
+        for _ in range(num_orders):
+            new_orders.append({
+                "order_id": fake.uuid4(),
+                "customer_id": customers[_]['customer_id'],
+                "delivery_completed_at": "",
+            })
+    # Now set all the other fields regardless
     for _ in range(num_orders):
-        order_id = fake.uuid4()
         delivery_slot = start_time + _ * DELIVERY_TIME_INTERVAL
-        orders.append({
-            "order_id": order_id,
-            "customer_id": customers[_]['customer_id'],
-            "delivery_id": delivery_id,
-            "status": "SCHEDULED",
-            "delivery_slot_start": format_datetime(delivery_slot),
-            "delivery_slot_end": format_datetime(delivery_slot + DELIVERY_TIME_INTERVAL),
-            "delivery_completed_at": "",
-            "updated_at": format_datetime(current_time())
-        })
+        new_orders[_]['delivery_id'] = delivery_id
+        new_orders[_]['status'] = "SCHEDULED"
+        new_orders[_]['updated_at'] = format_datetime(current_time())
+        new_orders[_]['delivery_slot_start'] = format_datetime(delivery_slot)
+        new_orders[_]['delivery_slot_end'] = format_datetime(delivery_slot + DELIVERY_TIME_INTERVAL)
+        new_orders[_]['updated_at'] = format_datetime(current_time())
+
     
-    delivery["orders"] = [order["order_id"] for order in orders]
+    delivery["orders"] = [order["order_id"] for order in new_orders]
 
     driver["status"] = "ASSIGNED"
     driver["updated_at"] = format_datetime(current_time())
 
     # Submit updates to Tinybird
-    logging.info("Posting new delivery to Tinybird...")
-    post_data_to_tb(tb_info, "deliveries_raw", [delivery])
-    logging.info("Posting new orders to Tinybird...")
-    post_data_to_tb(tb_info, "orders_raw", orders)
+    logging.info("Posting delivery to Tinybird...")
+    post_data_to_tb(tb_info, "cdc_deliveries", [delivery])
+    logging.info("Posting orders to Tinybird...")
+    post_data_to_tb(tb_info, "cdc_orders", new_orders)
     logging.info("Posting driver assignment to Tinybird...")
-    post_data_to_tb(tb_info, 'drivers_raw', [driver])
-    sleep(1)  # Ensure timestamps aren't in the same second
+    post_data_to_tb(tb_info, 'cdc_drivers', [driver])
     # Wait for update propagation
     wait_for_update(tb_info, delivery, 'delivery_id', 'deliveries_api')
-    wait_for_update(tb_info, orders[-1], 'order_id', 'orders_api')
+    wait_for_update(tb_info, new_orders[-1], 'order_id', 'orders_api')
     wait_for_update(tb_info, driver, 'driver_id', 'drivers_api')
-    logging.info("New delivery and orders propagated to Tinybird.")
+    logging.info("New delivery, orders and driver assignment propagated to Tinybird.")
 
-def wait_for_update(tb_info, obj, status_field, endpoint):
+def wait_for_update(tb_info, obj, status_field, endpoint, ts_field='updated_at'):
     obj_id = obj[status_field]
-    expected_updated_at = parse_datetime(obj['updated_at'])
-    logging.info(f"Waiting for {status_field} {obj_id} to have 'updated_at' >= {expected_updated_at}")
+    expected_updated_at = parse_datetime(obj[ts_field])
+    logging.info(f"Waiting for {status_field} {obj_id} to have '{ts_field}' >= {expected_updated_at}")
 
     while True:
         latest_record = fetch_tb_endpoint(tb_info, endpoint, {status_field: obj_id})
         if not latest_record:
             logging.info(f"{status_field} {obj_id} not found in endpoint {endpoint}. Waiting...")
-            sleep(1)
+            sleep(UPDATE_WAIT_SLEEP)
             continue
 
-        latest_updated_at = parse_datetime(latest_record[0]['updated_at'])
+        latest_updated_at = parse_datetime(latest_record[0][ts_field])
         if latest_updated_at >= expected_updated_at:
-            logging.info(f"{status_field} {obj_id} is up to date with 'updated_at' = {latest_updated_at}")
+            logging.info(f"{status_field} {obj_id} is up to date with '{ts_field}' = {latest_updated_at}")
             break
         else:
-            logging.info(f"Latest 'updated_at' {latest_updated_at} is before expected {expected_updated_at}. Waiting...")
-            sleep(1)
+            logging.info(f"Latest '{ts_field}' {latest_updated_at} is before expected {expected_updated_at}. Waiting...")
+            sleep(UPDATE_WAIT_SLEEP)
 
 def ensure_active_deliveries(tb_info):
     logging.info("Fetching Current Deliveries from Tinybird...")
@@ -212,12 +233,8 @@ def ensure_active_deliveries(tb_info):
     logging.info(f"{current_delivery_count} active deliveries found.")
     # If current deliveries is less than target, generate new deliveries
     if current_delivery_count < TARGET_ACTIVE_DELIVERIES:
-        # Ensure we have a pool of customers ready to receive orders
-        logging.info("Fetching Customers without active orders from Tinybird...")
-        customers = ensure_available_customers(tb_info)
-        drivers = ensure_available_drivers(tb_info)
         # Generate a new delivery and orders
-        generate_delivery_and_orders(tb_info, customers, drivers)
+        generate_delivery(tb_info)
     else:
         logging.info(f"Target active deliveries reached: {current_delivery_count}")
 
@@ -252,7 +269,7 @@ def parse_delivery_slots(orders):
     ]
     return active_slot_orders, missed_slot_orders, pending_slot_orders
 
-def batch_update(tb_info, table_name, items, id_field, api_endpoint):
+def batch_update(tb_info, table_name, items, id_field, api_endpoint, ts_field='updated_at'):
     """
     Handles batch updates for a given table in Tinybird.
 
@@ -269,12 +286,12 @@ def batch_update(tb_info, table_name, items, id_field, api_endpoint):
 
     # Set updated_at for all items to current time
     for item in items:
-        item['updated_at'] = format_datetime(current_time())
+        item[ts_field] = format_datetime(current_time())
 
     # Post batch update to Tinybird
     logging.info(f"Posting batch updates to {table_name} in Tinybird...")
     post_data_to_tb(tb_info, table_name, items)
-    wait_for_update(tb_info, items[-1], id_field, api_endpoint)
+    wait_for_update(tb_info, items[-1], id_field, api_endpoint, ts_field)
 
 def process_delivery_status_updates(tb_info):
     order_delivery_status = fetch_tb_endpoint(tb_info, 'deliveries_by_order_status')
@@ -304,8 +321,8 @@ def process_delivery_status_updates(tb_info):
                 else:
                     # Delivery has scheduled orders but no missed orders, so it's still in progress
                     pass
-        batch_update(tb_info, "deliveries_raw", batch_update_deliveries, 'delivery_id', 'deliveries_api')
-        batch_update(tb_info, "drivers_raw", batch_update_drivers, 'driver_id', 'drivers_api')
+        batch_update(tb_info, "cdc_deliveries", batch_update_deliveries, 'delivery_id', 'deliveries_api')
+        batch_update(tb_info, "cdc_drivers", batch_update_drivers, 'driver_id', 'drivers_api')
 
 def process_orders_for_delivery(tb_info, delivery):
     # Fetch current status of orders in delivery
@@ -323,13 +340,19 @@ def process_orders_for_delivery(tb_info, delivery):
         active.sort(key=lambda o: o['delivery_slot_start'])
         # For each order, generate a delivery event
         for order in active:
-            # First send real-time event to driver_events table
-            send_driver_status_event(tb_info, driver_id, 'DELIVERED', order['order_id'])
-            # Then prepare batch update to orders_raw table for later
-            order['status'] = 'DELIVERED'
-            order['delivery_completed_at'] = format_datetime(current_time())
-            out.append(order)
-            sleep(.1)  # Ensure timestamps aren't in the same moment
+            # Decide if this order was missed
+            if fake.random.random() < DELIVERY_MISS_RATE:
+                logging.info(f"Order {order['order_id']} was missed.")
+                missed.append(order)
+                continue
+            else:
+                # First send real-time event to driver_events table
+                send_driver_status_event(tb_info, driver_id, 'DELIVERED', order['order_id'])
+                # Then prepare batch update to cdc_orders table for later
+                order['status'] = 'DELIVERED'
+                order['delivery_completed_at'] = format_datetime(current_time())
+                out.append(order)
+                sleep(MINIMUM_TS_BOUNDARY)  # Ensure timestamps aren't in the same moment
         # Finally, send driver STOPPED event
         send_driver_status_event(tb_info, driver_id, 'STOPPED')
     else:
@@ -340,16 +363,16 @@ def process_orders_for_delivery(tb_info, delivery):
         for order in missed:
             # First send real-time event to driver_events table
             send_driver_status_event(tb_info, driver_id, 'MISSED', order['order_id'])
-            # Then prepare batch update to orders_raw table for later
+            # Then prepare batch update to cdc_orders table for later
             order['status'] = 'MISSED'
             out.append(order)
-            sleep(.1)  # Ensure timestamps aren't in the same moment
+            sleep(MINIMUM_TS_BOUNDARY)  # Ensure timestamps aren't in the same moment
     if pending:
         logging.info(f"Skipping {len(pending)} orders for Delivery {delivery['delivery_id']}.")
     return out
 
 def process_active_drivers(tb_info, active_drivers):
-    # Prepare batch update to orders_raw table
+    # Prepare batch update to cdc_orders table
     batch_order_updates = []
     for driver in active_drivers:
         # Fetch delivery info - driver would be unassigned on completion
@@ -372,15 +395,48 @@ def process_active_drivers(tb_info, active_drivers):
                 batch_order_updates += orders_update
                 
     # Check if we have any orders to batch update
-    batch_update(tb_info, "orders_raw", batch_order_updates, 'order_id', 'orders_api')
+    batch_update(tb_info, "cdc_orders", batch_order_updates, 'order_id', 'orders_api')
+
+def process_operations_tasks(tb_info):
+    ops_tasks = fetch_tb_endpoint(tb_info, 'operations_api')
+    if not ops_tasks:
+        logging.info("No operations tasks found to process.")
+    else:
+        for task in ops_tasks:
+            logging.info(f"Processing operations task {task['event_id']}...")
+            orders_details = fetch_tb_endpoint(tb_info, 'orders_api', {'orders_in': ','.join(task['event_info'])})
+            # Create an array of orders per delivery_id
+            deliveries_to_prune = {}
+            for order in orders_details:
+                if order['delivery_id'] not in deliveries_to_prune:
+                    deliveries_to_prune[order['delivery_id']] = []
+                deliveries_to_prune[order['delivery_id']].append(order)
+            # Fetch each delivery and prune the orders list to remove the orders we've just processed
+            deliveries_batch_update = []
+            for delivery_id, orders_to_prune in deliveries_to_prune.items():
+                delivery = fetch_tb_endpoint(tb_info, 'deliveries_api', {'delivery_id': delivery_id})[0]
+                delivery['orders'] = [o for o in delivery['orders'] if o not in orders_to_prune]
+                delivery['status'] = 'SCHEDULED'
+                deliveries_batch_update.append(delivery)
+            # Generate new delivery for these orders
+            generate_delivery(tb_info, orders=orders_details)
+            # Update cdc_deliveries table to remove the processed orders
+            batch_update(tb_info, "cdc_deliveries", deliveries_batch_update, 'delivery_id', 'deliveries_api')
+            # Mark task as completed
+            task['event_type'] = 'COMPLETED'
+            batch_update(tb_info, "operations_events", [task], 'event_id', 'operations_api', ts_field='event_time')
 
 def runner():
     logging.info("Reading Tinybird Connection info...")
     tb_info = read_tb_info()
     # Start outer loop
     while True:
+        # Start loop timer
+        start_time = current_time()
         # Ensure active deliveries
         ensure_active_deliveries(tb_info)
+        # Handle rescheduling requests
+        process_operations_tasks(tb_info)
         # Fetch active drivers from Tinybird
         logging.info("Fetching active drivers from Tinybird...")
         active_drivers = fetch_tb_endpoint(tb_info, 'drivers_api', {'status_in': 'ASSIGNED,ENROUTE,STOPPED'})
@@ -391,6 +447,10 @@ def runner():
             process_active_drivers(tb_info, active_drivers)
         # Determine if any deliveries are now compeleted given the processed order updates
         process_delivery_status_updates(tb_info)
+        # Calculate time taken
+        end_time = current_time()
+        time_taken = end_time - start_time
+        logging.info(f"Loop completed in {time_taken.total_seconds()} seconds.")
 
 if __name__ == '__main__':
     runner()

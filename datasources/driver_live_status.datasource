@@ -1,11 +1,12 @@
+# Data Source created from Pipe 'driver_live_status_update'
 
 SCHEMA >
     `driver_id` String,
-    `event_time` DateTime64(6),
-    `event_type` String,
+    `updated_at` DateTime64(6),
+    `status` String,
     `event_info` String
 
 ENGINE "ReplacingMergeTree"
-ENGINE_PARTITION_KEY "toYYYYMM(event_time)"
+ENGINE_PARTITION_KEY "toYYYYMM(updated_at)"
 ENGINE_SORTING_KEY "driver_id"
-ENGINE_VER "event_time"
+ENGINE_VER "updated_at"

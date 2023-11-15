@@ -1,0 +1,9 @@
+NODE customers_update_0
+SQL >
+
+    SELECT * FROM cdc_customers
+
+TYPE materialized
+DATASOURCE dwh_customers_latest
+
+

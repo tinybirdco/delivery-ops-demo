@@ -4,7 +4,7 @@ NODE deliveries_api_0
 SQL >
 
     %
-        SELECT * FROM deliveries_latest FINAL
+        SELECT * FROM dwh_deliveries_latest FINAL
         where 1
         {% if defined(delivery_id) %}
           and delivery_id = {{String(delivery_id, description="delivery_id to filter by", required=False)}}

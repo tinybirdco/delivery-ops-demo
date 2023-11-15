@@ -1,0 +1,17 @@
+NODE orders_live_events
+SQL >
+
+    SELECT 
+      event_info as order_id,
+      event_time as updated_at, 
+      event_type as status
+    FROM driver_events
+    where event_type in ['MISSED', 'DELIVERED']
+
+TYPE materialized
+DATASOURCE orders_live_status
+ENGINE "ReplacingMergeTree"
+ENGINE_PARTITION_KEY "toYYYYMM(updated_at)"
+ENGINE_SORTING_KEY "order_id"
+ENGINE_VER "updated_at"
+

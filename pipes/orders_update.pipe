@@ -1,0 +1,9 @@
+NODE orders_update_0
+SQL >
+
+    select * from cdc_orders
+
+TYPE materialized
+DATASOURCE dwh_orders_latest
+
+

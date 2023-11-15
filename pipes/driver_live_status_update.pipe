@@ -1,0 +1,18 @@
+NODE driver_live_status_0
+SQL >
+
+    SELECT 
+        driver_id, 
+        event_time as updated_at, 
+        event_type as status, 
+        event_info 
+    FROM driver_events
+    WHERE event_type in ['DELAYED', 'ENROUTE', 'STOPPED']
+
+TYPE materialized
+DATASOURCE driver_live_status
+ENGINE "ReplacingMergeTree"
+ENGINE_PARTITION_KEY "toYYYYMM(updated_at)"
+ENGINE_SORTING_KEY "driver_id"
+ENGINE_VER "updated_at"
+

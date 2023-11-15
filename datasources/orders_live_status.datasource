@@ -1,0 +1,11 @@
+# Data Source created from Pipe 'orders_live_status_update'
+
+SCHEMA >
+    `order_id` String,
+    `updated_at` DateTime64(6),
+    `status` String
+
+ENGINE "ReplacingMergeTree"
+ENGINE_PARTITION_KEY "toYYYYMM(updated_at)"
+ENGINE_SORTING_KEY "order_id"
+ENGINE_VER "updated_at"

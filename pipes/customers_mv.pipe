@@ -1,9 +1,0 @@
-NODE customers_mv_0
-SQL >
-
-    SELECT * FROM customers_raw
-
-TYPE materialized
-DATASOURCE customers_latest
-
-

@@ -1,0 +1,19 @@
+TOKEN "operations_tasks_endpoint_read_7254" READ
+
+NODE operations_tasks_0
+SQL >
+
+    select
+      event_id, 
+      event_info, 
+      parseDateTime64BestEffort(event_time, 6) as event_time, 
+      event_type
+    from operations_events
+
+TYPE materialized
+DATASOURCE operations_live_status
+ENGINE "ReplacingMergeTree"
+ENGINE_PARTITION_KEY "toYYYYMM(event_time)"
+ENGINE_SORTING_KEY "event_id"
+ENGINE_VER "event_time"
+

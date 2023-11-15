@@ -1,0 +1,9 @@
+
+SCHEMA >
+    `event_id` String `json:$.event_id`,
+    `event_info` Array(String) `json:$.event_info[:]`,
+    `event_time` String `json:$.event_time`,
+    `event_type` String `json:$.event_type`
+
+ENGINE "MergeTree"
+ENGINE_SORTING_KEY "event_id, event_time, event_type"

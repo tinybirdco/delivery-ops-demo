@@ -1,0 +1,9 @@
+NODE deliveries_update_0
+SQL >
+
+    SELECT * FROM cdc_deliveries
+
+TYPE materialized
+DATASOURCE dwh_deliveries_latest
+
+

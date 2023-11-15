@@ -8,7 +8,7 @@ SQL >
       COUNT(IF(status = 'SCHEDULED', 1, NULL)) AS scheduled_count,
       COUNT(IF(status = 'DELIVERED', 1, NULL)) AS delivered_count,
       COUNT(IF(status = 'MISSED', 1, NULL)) AS missed_count
-    FROM orders_latest FINAL
+    FROM orders_api
     GROUP BY delivery_id
 
 
@@ -20,7 +20,7 @@ SQL >
         dl_status as (
             select delivery_id, status as delivery_status,
             length(orders) as total_orders
-            from deliveries_latest FINAL
+            from dwh_deliveries_latest FINAL
         )
     select
         deliveries_by_order_status_0.delivery_id,

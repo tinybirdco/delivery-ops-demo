@@ -1,0 +1,12 @@
+TOKEN "operations_api_endpoint_read_6193" READ
+
+NODE operations_api_0
+SQL >
+
+    %
+    SELECT * FROM operations_live_status FINAL
+    where 1
+    {% if defined(event_id) %}
+      and event_id = {{String(event_id, description="event_id to filter by", required=False)}}
+    {% end %}
+

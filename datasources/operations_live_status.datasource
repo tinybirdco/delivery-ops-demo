@@ -1,0 +1,12 @@
+# Data Source created from Pipe 'operations_update'
+
+SCHEMA >
+    `event_id` String,
+    `event_info` Array(String),
+    `event_time` DateTime64(6),
+    `event_type` String
+
+ENGINE "ReplacingMergeTree"
+ENGINE_PARTITION_KEY "toYYYYMM(event_time)"
+ENGINE_SORTING_KEY "event_id"
+ENGINE_VER "event_time"

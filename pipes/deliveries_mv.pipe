@@ -1,9 +1,0 @@
-NODE deliveries_mv_0
-SQL >
-
-    SELECT * FROM deliveries_raw
-
-TYPE materialized
-DATASOURCE deliveries_latest
-
-
